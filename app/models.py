@@ -37,5 +37,8 @@ class Part(Base):
     #   - serial_number (texte, unique)
     #   - quality_result ("GOOD" ou "REJECTED")
     #   - produced_at (date/heure, valeur par défaut = maintenant)
+    serial_number: Mapped[str] = mapped_column(String(50), unique=True)
+    quality_result: Mapped[str] = mapped_column(String(20))
+    produced_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     work_order: Mapped[WorkOrder] = relationship(back_populates="parts")
