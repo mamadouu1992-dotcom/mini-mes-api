@@ -4,6 +4,8 @@ JOUR 1 - APRÈS-MIDI : un exemple complet (POST /orders) est fourni ;
 les autres endpoints sont à écrire par toi.
 """
 from fastapi import APIRouter, Depends, HTTPException
+
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app import models, schemas
@@ -108,3 +110,26 @@ def add_part(order_id: int, payload: schemas.PartCreate, db: Session = Depends(g
 # TODO : GET /orders/{order_id}/summary
 #        -> pièces bonnes, rejetées, total, taux de rendement (%)
 #        -> astuce : une seule requête SQL avec COUNT + CASE WHEN
+@router.get("/{order_id}/summary", response_model=schemas.OrderSummary)
+def get_order_summary(order_id: int, db: Session = Depends(get_db)):
+    """Résumé de production : pièces bonnes, rejetées et taux de rendement."""
+    order = db.get(models.WorkOrder, order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="Ordre introuvable")
+
+    stmt = select(
+        func.count(models.Part.id),
+        func.count(case((models.Part.quality_result == "GOOD", 1))),
+        func.count(case((models.Part.quality_result == "REJECTED", 1))),
+    ).where(models.Part.work_order_id == order_id)
+
+    total, good, rejected = db.execute(stmt).one()
+    yield_percent = round(good * 100.0 / total, 2) if total > 0 else 0.0
+
+    return schemas.OrderSummary(
+        order_id=order_id,
+        total_parts=total,
+        good_parts=good,
+        rejected_parts=rejected,
+        yield_percent=yield_percent,
+    )
