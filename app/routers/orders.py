@@ -76,6 +76,35 @@ def complete_order(order_id: int, db: Session = Depends(get_db)):
 #        -> refuser (409) si l'ordre n'est pas STARTED
 #        -> refuser (409) si la quantité prévue est déjà atteinte
 
+
+@router.post("/{order_id}/parts", response_model=schemas.PartOut, status_code=201)
+def add_part(order_id: int, payload: schemas.PartCreate, db: Session = Depends(get_db)):
+    """Enregistre une pièce produite pour un ordre démarré."""
+    order = db.get(models.WorkOrder, order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="Ordre introuvable")
+
+    # Règle 1 : on ne produit que sur un ordre démarré
+    if order.status != "STARTED":
+        raise HTTPException(status_code=409, detail="Impossible d'ajouter une pièce à un ordre non démarré")
+
+    # Règle 2 : on ne dépasse pas la quantité prévue
+    if len(order.parts) >= order.planned_quantity:
+        raise HTTPException(status_code=409, detail="Quantité prévue déjà atteinte")
+
+    part = models.Part(
+        work_order_id=order_id,
+        serial_number=payload.serial_number,
+        quality_result=payload.quality_result,
+    )
+    db.add(part)
+    db.commit()
+    db.refresh(part)
+    return part
+
+
+
+
 # TODO : GET /orders/{order_id}/summary
 #        -> pièces bonnes, rejetées, total, taux de rendement (%)
 #        -> astuce : une seule requête SQL avec COUNT + CASE WHEN
