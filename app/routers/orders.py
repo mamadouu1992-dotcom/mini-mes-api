@@ -32,9 +32,45 @@ def get_order(order_id: int, db: Session = Depends(get_db)):
 
 # TODO : PATCH /orders/{order_id}/start
 #        -> refuser (409) si le statut n'est pas CREATED
+@router.patch("/{order_id}/start", response_model=schemas.WorkOrderOut)
+def start_order(order_id: int, db: Session = Depends(get_db)):
+    """Démarre un ordre de fabrication (CREATED -> STARTED)."""
+    order = db.get(models.WorkOrder, order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="Ordre introuvable")
+
+    if order.status != "CREATED":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Impossible de démarrer un ordre au statut {order.status}",
+        )
+
+    order.status = "STARTED"
+    db.commit()
+    db.refresh(order)
+    return order
+
 
 # TODO : PATCH /orders/{order_id}/complete
 #        -> refuser (409) si le statut n'est pas STARTED
+
+@router.patch("/{order_id}/complete", response_model=schemas.WorkOrderOut)
+def complete_order(order_id: int, db: Session = Depends(get_db)):
+    """Termine un ordre de fabrication (STARTED -> COMPLETED)."""
+    order = db.get(models.WorkOrder, order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="Ordre introuvable")
+
+    if order.status != "STARTED":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Impossible de terminer un ordre au statut {order.status}",
+        )
+
+    order.status = "COMPLETED"
+    db.commit()
+    db.refresh(order)
+    return order
 
 # TODO : POST /orders/{order_id}/parts
 #        -> refuser (409) si l'ordre n'est pas STARTED
